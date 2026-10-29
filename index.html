@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07080c">
+<!-- ▼PWA設定 -->
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="イマメモ">
+<!-- ▲PWA設定 -->
+<title>イマメモ</title>
+<meta name="description" content="思ったら一言。時刻つきで残して、1分で1枚の書き出しとふりかえりもできるメモアプリ。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="イマメモ">
+<meta property="og:description" content="思ったら一言。時刻つきで残して、頭の中を整理するメモアプリ。">
+<meta property="og:image" content="https://example.com/imamemo-og.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+JP:wght@400;500;700;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+/* ===== 基本スタイル ===== */
+:root{
+  --bg:#07080c; --panel:rgba(255,255,255,.055); --panel2:rgba(255,255,255,.09);
+  --line:rgba(255,255,255,.10); --tx:#eef0f6; --sub:#8a90a3;
+  --acc:#c8ff3d; --cy:#5ee7ff; --vi:#a78bfa; --pk:#ff7ab6;
+  --m-normal:#9aa4b8; --m-moya:#6f86c9; --m-sukkiri:#4fe3b0; --m-yaruki:#ff9a52; --m-kansha:#c58bff;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--tx);font-family:'Noto Sans JP',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(520px 380px at 90% -5%,rgba(94,231,255,.16),transparent 70%),
+             radial-gradient(480px 380px at -10% 20%,rgba(167,139,250,.15),transparent 70%),
+             radial-gradient(520px 420px at 60% 110%,rgba(200,255,61,.09),transparent 70%)}
+#root{position:relative;z-index:1}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+input,textarea{font:inherit;color:inherit;outline:none}
+.mono{font-family:'JetBrains Mono',monospace}
+.disp{font-family:'Space Grotesk','Noto Sans JP',sans-serif}
+.app{max-width:520px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top,0px)) 16px calc(120px + var(--safe-b))}
+.h-date{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;margin-bottom:14px}
+.h-date .d{font-size:44px;font-weight:700;line-height:1;letter-spacing:-.02em}
+.h-date .d small{font-size:18px;color:var(--sub);font-weight:500;margin-left:6px}
+.h-date .sub{font-size:12px;color:var(--sub);margin-top:6px;letter-spacing:.04em}
+.row{display:flex;align-items:center;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:999px;background:var(--panel);border:1px solid var(--line);font-size:13px;color:var(--tx);white-space:nowrap}
+.chip.acc{background:var(--acc);color:#10140a;border-color:transparent;font-weight:700}
+.chip.on{background:rgba(200,255,61,.14);border-color:rgba(200,255,61,.5);color:var(--acc)}
+.iconbtn{width:40px;height:40px;border-radius:14px;background:var(--panel);border:1px solid var(--line);display:grid;place-items:center}
+.iconbtn svg{width:20px;height:20px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:16px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.sec-t{font-size:12px;letter-spacing:.14em;color:var(--sub);margin:22px 4px 10px;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+
+/* ===== 今日の一枚 ===== */
+.prompt{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:12px 14px;border-radius:16px;
+  background:linear-gradient(100deg,rgba(200,255,61,.13),rgba(94,231,255,.08));border:1px solid rgba(200,255,61,.28);margin-bottom:6px}
+.prompt .tag{font-size:10px;letter-spacing:.16em;color:var(--acc);font-weight:700;white-space:nowrap}
+.prompt .q{font-size:14px;flex:1;line-height:1.4}
+
+/* ===== メモ ===== */
+.memo{display:grid;grid-template-columns:52px 1fr;gap:10px;padding:14px 4px;border-bottom:1px solid var(--line)}
+.memo .t{font-size:12px;color:var(--sub);padding-top:3px}
+.memo .tx{font-size:16px;line-height:1.65;word-break:break-word;white-space:pre-wrap}
+.memo .mk{margin-right:6px}
+.memo img{width:100%;border-radius:14px;margin-top:10px;display:block;border:1px solid var(--line)}
+.memo .acts{display:flex;gap:4px;margin-top:6px;opacity:.55}
+.memo .acts button{padding:4px 8px;font-size:12px;border-radius:8px;color:var(--sub)}
+.memo .acts button.on{color:var(--acc)}
+.tg{color:var(--cy);font-weight:500}
+.sheetmini{margin-top:8px;border-left:2px solid var(--acc);padding:2px 0 2px 10px;font-size:13px;color:var(--sub);line-height:1.6}
+.sheetmini b{display:block;color:var(--tx);font-size:14px;margin-bottom:2px}
+.empty{text-align:center;color:var(--sub);padding:42px 10px;font-size:14px;line-height:1.9}
+
+/* ===== 入力バー ===== */
+.composer{position:fixed;left:0;right:0;bottom:calc(84px + var(--safe-b));z-index:20;padding:0 14px}
+.composer .in{max-width:492px;margin:0 auto;background:rgba(20,22,30,.82);border:1px solid var(--line);border-radius:22px;padding:8px 8px 8px 14px;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.composer textarea{width:100%;background:none;border:0;resize:none;max-height:120px;min-height:28px;line-height:1.5;font-size:16px;padding:4px 0}
+.composer .bar{display:flex;align-items:center;gap:6px}
+.composer .tags{display:flex;gap:6px;overflow-x:auto;flex:1;scrollbar-width:none;padding:2px 0}
+.composer .tags::-webkit-scrollbar{display:none}
+.tagbtn{font-size:12px;padding:5px 10px;border-radius:999px;background:var(--panel);border:1px solid var(--line);color:var(--cy);white-space:nowrap}
+.sm{width:38px;height:38px;border-radius:13px;display:grid;place-items:center;background:var(--panel)}
+.sm svg{width:19px;height:19px}
+.sm.rec{background:var(--pk);color:#1a0610;animation:pulse 1s infinite}
+.send{width:42px;height:38px;border-radius:13px;background:var(--acc);color:#10140a;display:grid;place-items:center}
+.send:disabled{opacity:.3}
+.thumb{position:relative;display:inline-block;margin:4px 0 6px}
+.thumb img{height:64px;border-radius:10px;display:block}
+.thumb button{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:#000;border:1px solid var(--line);font-size:12px}
+@keyframes pulse{50%{box-shadow:0 0 0 8px rgba(255,122,182,.0),0 0 0 0 rgba(255,122,182,.6)}}
+
+/* ===== 気分ボタン（任意） ===== */
+.moods{display:flex;gap:6px;align-items:center;margin:2px 0 6px}
+.moods .lbl{font-size:11px;color:var(--sub);margin-right:4px;letter-spacing:.06em;white-space:nowrap}
+.mood-b{width:38px;height:34px;border-radius:12px;background:var(--panel);border:1.5px solid transparent;font-size:18px;display:grid;place-items:center;opacity:.75;transition:.15s}
+.mood-b.on{opacity:1;transform:scale(1.1)}
+
+/* ===== 下部ナビ ===== */
+.nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + var(--safe-b));z-index:30;display:flex;gap:2px;padding:6px;border-radius:26px;
+  background:rgba(20,22,30,.86);border:1px solid var(--line);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);box-shadow:0 12px 40px rgba(0,0,0,.55)}
+.nav button{width:76px;padding:9px 0 7px;border-radius:20px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--sub);transition:.2s}
+.nav button svg{width:22px;height:22px}
+.nav button.on{background:var(--acc);color:#10140a;font-weight:700}
+
+/* ===== オーバーレイ ===== */
+.ov{position:fixed;inset:0;z-index:60;background:var(--bg);overflow:auto;animation:up .25s ease}
+.ov::before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(500px 360px at 100% 0,rgba(94,231,255,.13),transparent 70%),radial-gradient(400px 320px at 0 100%,rgba(200,255,61,.08),transparent 70%)}
+.ov .in{position:relative;max-width:520px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top,0px)) 16px calc(40px + var(--safe-b))}
+@keyframes up{from{transform:translateY(24px);opacity:0}}
+.ov-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.ov-h .ttl{font-weight:700;font-size:16px}
+.txtbtn{font-size:15px;color:var(--cy);padding:8px 4px}
+.txtbtn.acc{color:var(--acc);font-weight:700}
+.seg{display:inline-flex;padding:4px;border-radius:14px;background:var(--panel);border:1px solid var(--line);gap:2px}
+.seg button{padding:7px 16px;border-radius:10px;font-size:13px;color:var(--sub)}
+.seg button.on{background:var(--panel2);color:var(--tx);font-weight:700}
+.titlein{width:100%;background:none;border:0;border-bottom:1px solid var(--line);font-size:22px;font-weight:700;padding:10px 0;line-height:1.4}
+.ring{position:relative;width:64px;height:64px;flex:none}
+.ring svg{width:64px;height:64px;transform:rotate(-90deg)}
+.ring .n{position:absolute;inset:0;display:grid;place-items:center;font-size:14px}
+.line-in{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px dashed var(--line)}
+.line-in i{color:var(--acc);font-style:normal;margin-top:2px;font-size:12px}
+.line-in input,.line-in textarea{flex:1;background:none;border:0;font-size:16px;line-height:1.6;resize:none}
+.pair{padding:12px 14px;border-radius:16px;background:var(--panel);border:1px solid var(--line);margin-bottom:10px}
+.pair label{display:block;font-size:10px;letter-spacing:.16em;color:var(--acc);margin:6px 0 2px;font-weight:700}
+.pair label.why{color:var(--cy)}
+.pair input{width:100%;background:none;border:0;font-size:16px;padding:4px 0;border-bottom:1px solid var(--line)}
+.hint{font-size:12px;color:var(--sub);margin:10px 2px;line-height:1.7}
+
+/* ===== ファイル ===== */
+.desk{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.sheet{position:relative;padding:14px 14px 38px;border-radius:6px;background:linear-gradient(160deg,#f6f3ea,#e9e4d4);color:#1b1d26;min-height:150px;text-align:left;box-shadow:0 12px 28px rgba(0,0,0,.45);transition:.2s}
+.sheet:active{transform:scale(.97) rotate(0)!important}
+.sheet::before{content:"";position:absolute;top:-8px;left:50%;width:44px;height:16px;margin-left:-22px;background:rgba(200,255,61,.75);transform:rotate(-3deg)}
+.sheet h4{margin:4px 0 8px;font-size:14px;line-height:1.4;padding-bottom:6px;border-bottom:2px solid #d33b3b}
+.sheet p{margin:3px 0;font-size:12px;color:#40434f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sheet .st{position:absolute;right:10px;bottom:10px;font-size:11px;color:#d33b3b;border:1.5px solid #d33b3b;border-radius:50%;padding:7px 6px;transform:rotate(-8deg)}
+.sheet.dig::after{content:"掘";position:absolute;left:10px;bottom:10px;font-size:11px;font-weight:900;color:#10140a;background:var(--acc);padding:2px 6px;border-radius:4px}
+
+/* ===== ふりかえり ===== */
+.stat{display:flex;gap:18px;margin:16px 2px 4px;align-items:baseline}
+.stat div{font-size:12px;color:var(--sub)}
+.stat b{font-size:34px;color:var(--tx);margin-right:3px;font-family:'Space Grotesk',sans-serif}
+.wx{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:12px}
+.wx>div{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;color:var(--sub)}
+.wx .ic{font-size:22px}
+.wx .cn{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;color:#10140a}
+.mix{display:flex;height:12px;border-radius:99px;overflow:hidden;margin:14px 0 10px;background:var(--panel)}
+.mchips{display:flex;flex-wrap:wrap;gap:8px}
+.mchip{display:inline-flex;gap:6px;align-items:center;padding:7px 12px;border-radius:999px;font-size:13px;background:var(--panel);border:1px solid var(--line)}
+.mchip i{width:8px;height:8px;border-radius:50%}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal .h{font-size:11px;color:var(--sub);text-align:center}
+.cal .c{aspect-ratio:1;border-radius:10px;display:grid;place-items:center;font-size:12px;background:var(--panel);position:relative}
+.cal .c i{position:absolute;bottom:4px;width:6px;height:6px;border-radius:50%}
+.heat{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,1fr);gap:4px}
+.heat i{aspect-ratio:1;border-radius:3px;background:var(--panel);display:block}
+.note{padding:14px;border-radius:14px;background:linear-gradient(140deg,rgba(200,255,61,.12),rgba(94,231,255,.07));border:1px solid rgba(200,255,61,.25);font-size:14px;line-height:1.7;margin-bottom:10px}
+.note small{display:block;margin-top:6px;color:var(--sub);font-size:11px}
+.pn{display:flex;align-items:center;justify-content:space-between;margin:18px 0 4px}
+.pn b{font-size:15px}
+.pn button{width:36px;height:36px;border-radius:12px;background:var(--panel);border:1px solid var(--line)}
+.pn button:disabled{opacity:.25}
+
+/* ===== 設定・その他 ===== */
+.set{display:flex;justify-content:space-between;align-items:center;padding:15px 4px;border-bottom:1px solid var(--line);font-size:15px;width:100%;text-align:left}
+.set small{display:block;color:var(--sub);font-size:12px;margin-top:3px}
+.set.danger{color:var(--pk)}
+.search{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:18px;background:var(--panel);border:1px solid var(--line)}
+.search input{flex:1;background:none;border:0;font-size:16px}
+.toast{position:fixed;left:50%;bottom:calc(170px + var(--safe-b));transform:translateX(-50%);z-index:90;background:var(--tx);color:#10140a;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:700;animation:up .2s ease;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+// ▼ 共通ユーティリティ
+const pad = n => String(n).padStart(2, '0');
+const dkey = t => { const d = new Date(t); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+const WD = ['日', '月', '火', '水', '木', '金', '土'];
+const tm = t => { const d = new Date(t); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+const mdw = t => { const d = new Date(t); return (d.getMonth() + 1) + '/' + d.getDate() + '（' + WD[d.getDay()] + '）'; };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const parseTags = s => (String(s || '').match(/#[^\s#]+/g) || []).map(x => x.slice(1));
+const hash = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); };
+const STORE_KEY = 'imamemo.v1';
+// ▲ 共通ユーティリティ
+
+// ▼ 定義データ（気持ち・マーク・お題）
+const MOODS = [
+  { key: 'moya',    label: 'モヤモヤ', icon: '🌫️', wx: 'どんより',  color: 'var(--m-moya)',    kw: ['モヤ', 'もや', '不安', '心配', '疲れ', 'つかれ', 'しんど', '嫌', 'イライラ', '困', '迷', 'なぜ', 'どうして', '気後れ', '緊張', '焦'] },
+  { key: 'kansha',  label: '感謝',     icon: '🌼', wx: 'ひだまり',  color: 'var(--m-kansha)',  kw: ['ありがとう', '感謝', 'おかげ', '助かった', 'うれしい', '嬉しい', '幸せ', '楽しかった'] },
+  { key: 'yaruki',  label: 'やる気',   icon: '🌅', wx: 'あさやけ',  color: 'var(--m-yaruki)',  kw: ['やる', '頑張', 'がんばる', '挑戦', '始め', 'よし', 'やってみ', '決めた', 'やりたい'] },
+  { key: 'sukkiri', label: 'すっきり', icon: '🍃', wx: 'そよ風',    color: 'var(--m-sukkiri)', kw: ['すっきり', 'スッキリ', '整理', '終わった', 'できた', '楽', '軽', '散歩', '決まった', '解決', 'ぶれない'] },
+  { key: 'normal',  label: 'ふつう',   icon: '☁️', wx: 'くもり',    color: 'var(--m-normal)',  kw: [] }
+];
+const MOOD = Object.fromEntries(MOODS.map(m => [m.key, m]));
+const MARKS = [
+  { key: 'move',  icon: '🏃', kw: ['ランニング', '走', '筋トレ', 'ジム', 'ストレッチ', '運動', '歩い', '散歩'] },
+  { key: 'study', icon: '📘', kw: ['勉強', '学習', '資格', '授業', '復習'] },
+  { key: 'work',  icon: '💼', kw: ['仕事', '会議', '上司', '資料', 'メール', '打ち合わせ', '打合'] },
+  { key: 'read',  icon: '📖', kw: ['読書', '本を', '読んだ', '読み'] },
+  { key: 'meal',  icon: '☕', kw: ['ごはん', 'ご飯', 'ランチ', 'カフェ', 'コーヒー', '食べ'] }
+];
+const PROMPTS = [
+  'どうすれば朝の30分を自分のために使えるか', 'いま一番ひっかかっていることは何か', '最近うれしかったことの理由は何か',
+  '先延ばしにしていることの最初の一歩は何か', 'なぜあの場面で緊張したのか', '一週間後の自分に伝えたいことは何か',
+  '手放してもいいことは何か', 'いま足りないものは時間か気力か', '今日の自分に点数をつけるなら何点で、なぜか'
+];
+const DEFAULT_TAGS = ['仕事', '読書', '習慣', '筋トレ', 'アイデア', '気づき'];
+const INSIGHT_KW = ['気づ', 'わかった', '分かった', 'おかげ', 'かもしれない', 'ぶれない', '減る', '半分は'];
+// ▲ 定義データ（気持ち・マーク・お題）
+
+// ▼ 判定ロジック
+const itemText = it => it.kind === 'sheet'
+  ? [it.title, ...(it.rows || []), ...(it.pairs || []).flatMap(p => [p.t, p.r])].join(' ')
+  : (it.text || '');
+const classify = it => {
+  if (it.mood && MOOD[it.mood]) return it.mood; // 手動で選んだ気分を優先
+  const s = itemText(it);
+  for (const m of MOODS) if (m.kw.some(k => s.includes(k))) return m.key;
+  return 'normal';
+};
+const detectMark = s => (MARKS.find(m => m.kw.some(k => s.includes(k))) || {}).icon || '';
+const isInsight = it => it.kind !== 'sheet' && (it.star || parseTags(it.text).includes('気づき') || INSIGHT_KW.some(k => (it.text || '').includes(k)));
+const dominant = list => {
+  if (!list.length) return null;
+  const c = {}; list.forEach(i => { const k = classify(i); c[k] = (c[k] || 0) + 1; });
+  let best = 'normal', n = 0;
+  MOODS.filter(m => m.key !== 'normal').forEach(m => { if ((c[m.key] || 0) > n) { best = m.key; n = c[m.key]; } });
+  return best;
+};
+const moodCounts = list => { const c = {}; MOODS.forEach(m => c[m.key] = 0); list.forEach(i => c[classify(i)]++); return c; };
+const groupByDay = list => { const g = {}; list.forEach(i => { (g[dkey(i.ts)] = g[dkey(i.ts)] || []).push(i); }); return g; };
+const todayPrompt = () => PROMPTS[hash(dkey(Date.now())) % PROMPTS.length];
+const rangeOf = (period, off) => {
+  const n = new Date(); const y = n.getFullYear(), m = n.getMonth(), d = n.getDate();
+  if (period === 'day') { const s = new Date(y, m, d + off); return { s, e: new Date(y, m, d + off + 1), label: off === 0 ? '今日' : mdw(s) }; }
+  if (period === 'week') { const w = (n.getDay() + 6) % 7; const s = new Date(y, m, d - w + off * 7); const e = new Date(s.getFullYear(), s.getMonth(), s.getDate() + 7); const l = new Date(e.getTime() - 86400000); return { s, e, label: off === 0 ? '今週' : '', sub: (s.getMonth() + 1) + '/' + s.getDate() + ' ～ ' + (l.getMonth() + 1) + '/' + l.getDate() }; }
+  if (period === 'month') { const s = new Date(y, m + off, 1); return { s, e: new Date(y, m + off + 1, 1), label: s.getFullYear() + '年' + (s.getMonth() + 1) + '月' }; }
+  return { s: new Date(0), e: new Date(9e12), label: 'これまで' };
+};
+// ▲ 判定ロジック
+
+// ▼ ふりかえり生成（ルールベース。将来ここを AI API 呼び出しに差し替える）
+const clip = (s, n) => s.length > n ? s.slice(0, n) + '…' : s;
+const buildSummary = list => {
+  if (!list.length) return { lines: [], note: 'まだ記録がありません。思ったことを一言だけ書いてみましょう。' };
+  const sheets = list.filter(i => i.kind === 'sheet');
+  const memos = list.filter(i => i.kind !== 'sheet');
+  const lines = [];
+  memos.slice(0, 3).forEach(i => lines.push(clip(i.text.replace(/#[^\s#]+/g, '').trim() || '写真を残した', 28)));
+  sheets.slice(0, 2).forEach(i => lines.push('1枚「' + clip(i.title || '無題', 18) + '」を書いた'));
+  const c = moodCounts(list); const pos = c.sukkiri + c.yaruki + c.kansha;
+  let note = list.length + '件を言葉にして外に出しました。';
+  if (c.moya > pos) note += 'モヤモヤが多めの日。書き出せた分、整理は進んでいます。';
+  else if (pos > 0) note += '前向きな気持ちが' + Math.round(pos / list.length * 10) + '割。いい流れです。';
+  else note += '書いた分だけ、頭の中が軽くなっています。';
+  return { lines, note };
+};
+const buildPeriodNote = list => {
+  if (!list.length) return 'この期間の記録はまだありません。';
+  const c = moodCounts(list); const pos = c.sukkiri + c.yaruki + c.kansha;
+  return '前向きな気持ちが' + Math.round(pos / list.length * 10) + '割の期間でした。';
+};
+const weatherWords = c => {
+  const top = MOODS.filter(m => c[m.key] > 0).sort((a, b) => c[b.key] - c[a.key]).slice(0, 2);
+  if (!top.length) return '—';
+  return top.length === 1 ? top[0].wx : top[0].wx + ' ときどき ' + top[1].wx;
+};
+// ▲ ふりかえり生成
+
+// ▼ アイコン
+const P = {
+  write: 'M4 7h10M4 12h7M4 17h5M14 17l1-3.5 6-6a1.8 1.8 0 012.5 2.5l-6 6L14 17z',
+  folder: 'M3 7a2 2 0 012-2h4l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z',
+  cloud: 'M7 18a4 4 0 01-.5-8 5.5 5.5 0 0110.7 1.2A3.4 3.4 0 0117 18H7z',
+  gear: 'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 13.5a7.7 7.7 0 000-3l2-1.5-2-3.4-2.3 1a7.5 7.5 0 00-2.6-1.5L14 2.5h-4l-.5 2.6A7.5 7.5 0 006.900 6.600l-2.300-1-2 3.400 2 1.500a7.700 7.700 0 000 3l-2 1.500 2 3.400 2.300-1a7.500 7.500 0 002.600 1.500l.500 2.600h4l.500-2.600a7.500 7.500 0 002.600-1.500l2.300 1 2-3.400-2-1.500z',
+  search: 'M11 18a7 7 0 100-14 7 7 0 000 14zM21 21l-5-5',
+  mic: 'M12 15a3 3 0 003-3V6a3 3 0 00-6 0v6a3 3 0 003 3zM6 11a6 6 0 0012 0M12 17v4',
+  img: 'M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM8.500 10a1.500 1.500 0 100-3 1.500 1.500 0 000 3zM4 17l5-5 4 4 3-3 4 4',
+  send: 'M5 12l14-7-5 14-3-6-6-1z',
+  timer: 'M12 8v4l2.500 1.500M12 21a8 8 0 100-16 8 8 0 000 16zM10 2h4',
+  back: 'M15 5l-7 7 7 7',
+  next: 'M9 5l7 7-7 7',
+  spark: 'M12 3l1.800 5.200L19 10l-5.200 1.800L12 17l-1.800-5.200L5 10l5.200-1.800L12 3z',
+  cal: 'M4 8a2 2 0 012-2h12a2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V8zM4 11h16M8 3v4M16 3v4',
+  dice: 'M5 5h14v14H5zM9 9h.01M15 9h.01M9 15h.01M15 15h.01M12 12h.01'
+};
+const Icon = ({ n, fill }) => <svg viewBox="0 0 24 24" fill={fill ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={P[n]} /></svg>;
+// ▲ アイコン
+
+// ▼ 小物コンポーネント
+const Rich = ({ text }) => text.split(/(#[^\s#]+)/g).map((p, i) => p.startsWith('#') && p.length > 1 ? <span key={i} className="tg">{p}</span> : <span key={i}>{p}</span>);
+const readFileAsResizedURL = file => new Promise((res, rej) => {
+  const r = new FileReader();
+  r.onerror = rej;
+  r.onload = () => {
+    const img = new Image();
+    img.onerror = rej;
+    img.onload = () => {
+      const max = 720; const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      res(c.toDataURL('image/jpeg', 0.62));
+    };
+    img.src = r.result;
+  };
+  r.readAsDataURL(file);
+});
+const MemoRow = ({ it, onStar, onDel, onOpen }) => (
+  <div className="memo">
+    <div className="t mono">{tm(it.ts)}</div>
+    <div>
+      {it.kind === 'sheet' ? (
+        <button style={{ textAlign: 'left', width: '100%' }} onClick={() => onOpen(it)}>
+          <div className="tx"><span className="mk">⏱</span><b>{it.title || '無題'}</b></div>
+          <div className="sheetmini">
+            {it.mode === 'dig'
+              ? (it.pairs || []).slice(0, 2).map((p, i) => <div key={i}>{p.t}</div>)
+              : (it.rows || []).filter(Boolean).slice(0, 3).map((r, i) => <div key={i}>・{r}</div>)}
+          </div>
+        </button>
+      ) : (
+        <>
+          <div className="tx">{it.mood && MOOD[it.mood] && <span className="mk" title={MOOD[it.mood].label}>{MOOD[it.mood].icon}</span>}{it.mark && <span className="mk">{it.mark}</span>}<Rich text={it.text || ''} /></div>
+          {it.photo && <img src={it.photo} alt="" />}
+          <div className="acts">
+            <button className={it.star ? 'on' : ''} onClick={() => onStar(it.id)}>{it.star ? '★ 気づき' : '☆ 気づきに'}</button>
+            <button onClick={() => onDel(it.id)}>削除</button>
+          </div>
+        </>
+      )}
+    </div>
+  </div>
+);
+// ▲ 小物コンポーネント
+
+// ▼ 「書く」タブ
+const WriteTab = ({ items, add, onStar, onDel, openSheet, openReader, prefill, openSearch, setToast }) => {
+  const [text, setText] = useState(prefill || '');
+  const [photo, setPhoto] = useState('');
+  const [mood, setMood] = useState('');
+  const [rec, setRec] = useState(false);
+  const [showSum, setShowSum] = useState(false);
+  const [showLY, setShowLY] = useState(false);
+  const recRef = useRef(null); const fileRef = useRef(null); const taRef = useRef(null);
+  const now = new Date();
+  const today = dkey(now);
+  const todays = useMemo(() => items.filter(i => dkey(i.ts) === today).sort((a, b) => b.ts - a.ts), [items, today]);
+  const lastYear = useMemo(() => items.filter(i => { const d = new Date(i.ts); return d.getFullYear() < now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate(); }), [items, today]);
+  const sheetsToday = todays.filter(i => i.kind === 'sheet').length;
+  const sum = useMemo(() => buildSummary(todays), [todays]);
+  const topTags = useMemo(() => {
+    const c = {}; items.forEach(i => parseTags(itemText(i)).forEach(t => c[t] = (c[t] || 0) + 1));
+    const used = Object.keys(c).sort((a, b) => c[b] - c[a]);
+    return [...new Set([...used, ...DEFAULT_TAGS])].slice(0, 8);
+  }, [items]);
+  useEffect(() => { const t = taRef.current; if (t) { t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 120) + 'px'; } }, [text]);
+  const submit = () => {
+    if (!text.trim() && !photo) return;
+    add({ kind: 'memo', text: text.trim(), photo, mark: detectMark(text), mood });
+    setText(''); setPhoto(''); setMood('');
+  };
+  const addTag = t => setText(s => (s && !/\s$/.test(s) ? s + ' ' : s) + '#' + t + ' ');
+  const pick = async e => {
+    const f = e.target.files && e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    try { setPhoto(await readFileAsResizedURL(f)); } catch (_) { setToast('画像を読み込めませんでした'); }
+  };
+  const toggleRec = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { setToast('このブラウザは音声入力に未対応です'); return; }
+    if (rec && recRef.current) { recRef.current.stop(); return; }
+    const r = new SR(); r.lang = 'ja-JP'; r.interimResults = false; r.continuous = false;
+    r.onresult = ev => { const s = Array.from(ev.results).map(x => x[0].transcript).join(''); setText(t => t + s); };
+    r.onend = () => setRec(false); r.onerror = () => setRec(false);
+    recRef.current = r; setRec(true); r.start();
+  };
+  return (
+    <>
+      <div className="h-date">
+        <div>
+          <div className="d disp">{now.getMonth() + 1}/{now.getDate()}<small>{WD[now.getDay()]}曜日</small></div>
+          <div className="sub">今日 {todays.length} 件{lastYear.length ? ' ・ 去年の今日 ' + lastYear.length + ' 件' : ''}</div>
+        </div>
+        <div className="row">
+          <button className="iconbtn" title="1分で1枚" onClick={() => openSheet({ mode: 'one' })}><Icon n="timer" /></button>
+          <button className="iconbtn" title="さがす" onClick={openSearch}><Icon n="search" /></button>
+        </div>
+      </div>
+      <button className="prompt" onClick={() => openSheet({ mode: 'one', title: todayPrompt() })}>
+        <span className="tag">今日の一枚</span><span className="q">{todayPrompt()}</span><Icon n="next" />
+      </button>
+      <div className="row" style={{ margin: '12px 0 0', gap: 8, flexWrap: 'wrap' }}>
+        <button className={'chip' + (showSum ? ' on' : '')} onClick={() => setShowSum(v => !v)}><Icon n="spark" />今日のまとめ</button>
+        {lastYear.length > 0 && <button className={'chip' + (showLY ? ' on' : '')} onClick={() => setShowLY(v => !v)}><Icon n="cal" />去年の今日</button>}
+        <span className="chip" style={{ color: 'var(--sub)' }}>1枚 {sheetsToday}/10</span>
+      </div>
+      {showSum && (
+        <div className="note" style={{ marginTop: 12 }}>
+          {sum.lines.map((l, i) => <div key={i}>・{l}</div>)}
+          <div style={{ marginTop: sum.lines.length ? 8 : 0 }}>{sum.note}</div>
+          <small>※日付が変わる前に開いても、その時点までの内容でまとめます</small>
+        </div>
+      )}
+      {showLY && lastYear.map(i => (
+        <div key={i.id} className="note" style={{ marginTop: 12 }}><small style={{ margin: '0 0 4px' }}>{new Date(i.ts).getFullYear()}年 {tm(i.ts)}</small>{i.kind === 'sheet' ? '1枚「' + i.title + '」' : i.text}</div>
+      ))}
+      <div className="sec-t"><span>Today</span></div>
+      {todays.length === 0
+        ? <div className="empty">まだ今日のメモはありません。<br />下の入力欄に、いま思ったことを一言どうぞ。</div>
+        : todays.map(i => <MemoRow key={i.id} it={i} onStar={onStar} onDel={onDel} onOpen={openReader} />)}
+      <div className="composer"><div className="in">
+        {photo && <div className="thumb"><img src={photo} alt="" /><button onClick={() => setPhoto('')}>✕</button></div>}
+        <textarea ref={taRef} rows="1" value={text} placeholder="いま思ったことを一言" onChange={e => setText(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && window.matchMedia('(hover:hover)').matches) { e.preventDefault(); submit(); } }} />
+        <div className="moods"><span className="lbl">気分</span>
+          {MOODS.map(m => <button key={m.key} title={m.label} className={'mood-b' + (mood === m.key ? ' on' : '')}
+            style={mood === m.key ? { borderColor: m.color, background: 'rgba(255,255,255,.12)' } : null}
+            onClick={() => setMood(v => v === m.key ? '' : m.key)}>{m.icon}</button>)}
+        </div>
+        <div className="bar">
+          <div className="tags">{topTags.map(t => <button key={t} className="tagbtn" onClick={() => addTag(t)}>#{t}</button>)}</div>
+          <button className="sm" onClick={() => fileRef.current.click()}><Icon n="img" /></button>
+          <button className={'sm' + (rec ? ' rec' : '')} onClick={toggleRec}><Icon n="mic" /></button>
+          <button className="send" disabled={!text.trim() && !photo} onClick={submit}><Icon n="send" /></button>
+          <input ref={fileRef} type="file" accept="image/*" hidden onChange={pick} />
+        </div>
+      </div></div>
+    </>
+  );
+};
+// ▲ 「書く」タブ
+
+// ▼ 1枚エディタ（1分で1枚 / ほりさげ）
+const SheetEditor = ({ initial, onClose, onSave }) => {
+  const [mode, setMode] = useState(initial.mode || 'one');
+  const [title, setTitle] = useState(initial.title || '');
+  const [rows, setRows] = useState(['', '', '', '']);
+  const [pairs, setPairs] = useState([{ t: '', r: '' }]);
+  const [left, setLeft] = useState(60);
+  const [running, setRunning] = useState(false);
+  useEffect(() => {
+    if (!running || left <= 0) return;
+    const id = setTimeout(() => setLeft(l => l - 1), 1000);
+    return () => clearTimeout(id);
+  }, [running, left]);
+  const setRow = (i, v) => { setRows(r => r.map((x, k) => k === i ? v : x)); if (!running && left === 60) setRunning(true); };
+  const setPair = (i, key, v) => setPairs(p => p.map((x, k) => k === i ? { ...x, [key]: v } : x));
+  const valid = mode === 'one' ? (title.trim() || rows.some(r => r.trim())) : (title.trim() || pairs.some(p => p.t.trim()));
+  const save = () => {
+    if (!valid) return;
+    onSave(mode === 'one'
+      ? { kind: 'sheet', mode, title: title.trim(), rows: rows.map(r => r.trim()).filter(Boolean), tags: parseTags(title) }
+      : { kind: 'sheet', mode, title: title.trim(), pairs: pairs.filter(p => p.t.trim() || p.r.trim()), tags: parseTags(title) });
+  };
+  const C = 2 * Math.PI * 28;
+  return (
+    <div className="ov"><div className="in">
+      <div className="ov-h">
+        <button className="txtbtn" onClick={onClose}>やめる</button>
+        <div className="seg"><button className={mode === 'one' ? 'on' : ''} onClick={() => setMode('one')}>1分で1枚</button><button className={mode === 'dig' ? 'on' : ''} onClick={() => setMode('dig')}>ほりさげ</button></div>
+        <button className="txtbtn acc" style={{ opacity: valid ? 1 : .35 }} onClick={save}>できた</button>
+      </div>
+      <div className="row" style={{ alignItems: 'flex-start', gap: 14 }}>
+        <div style={{ flex: 1 }}>
+          <div className="hint" style={{ margin: 0 }}>題</div>
+          <input className="titlein" value={title} placeholder="いま考えたいことは？" onChange={e => setTitle(e.target.value)} />
+          {!title && <button className="chip" style={{ marginTop: 10 }} onClick={() => setTitle(todayPrompt())}><Icon n="spark" />今日の題を使う</button>}
+        </div>
+        {mode === 'one' && (
+          <div className="ring">
+            <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="var(--line)" strokeWidth="5" />
+              <circle cx="32" cy="32" r="28" fill="none" stroke={left > 0 ? 'var(--acc)' : 'var(--pk)'} strokeWidth="5" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - left / 60)} style={{ transition: 'stroke-dashoffset 1s linear' }} /></svg>
+            <div className="n mono">{left > 0 ? Math.floor(left / 60) + ':' + pad(left % 60) : '終了'}</div>
+          </div>
+        )}
+      </div>
+      {mode === 'one' ? (
+        <>
+          <div style={{ marginTop: 18 }}>
+            {rows.map((r, i) => <div key={i} className="line-in"><i>●</i><input value={r} placeholder={i === 0 ? '浮かんだ順にどんどん' : ''} onChange={e => setRow(i, e.target.value)} /></div>)}
+          </div>
+          <button className="chip" style={{ marginTop: 14 }} onClick={() => setRows(r => [...r, ''])}>＋ 行を足す</button>
+          <div className="hint">1分で4〜6行。考えすぎず、浮かんだまま書きます。タイマーは書き始めると動きます。</div>
+        </>
+      ) : (
+        <>
+          <div style={{ marginTop: 18 }}>
+            {pairs.map((p, i) => (
+              <div className="pair" key={i}>
+                <label>考え {i + 1}</label><input value={p.t} placeholder={i === 0 ? 'まず思いつくこと' : 'さらに奥にある考え'} onChange={e => setPair(i, 't', e.target.value)} />
+                <label className="why">わけ</label><input value={p.r} placeholder="なぜそう思う？" onChange={e => setPair(i, 'r', e.target.value)} />
+              </div>
+            ))}
+          </div>
+          <button className="chip acc" onClick={() => setPairs(p => [...p, { t: '', r: '' }])}>この「わけ」をさらに掘る ↓</button>
+          <div className="hint">考えと、そのわけを分けて書きます。わけの中から次の考えを拾って、深めていきます。</div>
+        </>
+      )}
+    </div></div>
+  );
+};
+// ▲ 1枚エディタ
+
+// ▼ 1枚リーダー
+const SheetReader = ({ it, onClose, onDel }) => (
+  <div className="ov"><div className="in">
+    <div className="ov-h"><button className="txtbtn" onClick={onClose}>閉じる</button><div className="mono" style={{ color: 'var(--sub)', fontSize: 12 }}>{mdw(it.ts)} {tm(it.ts)}</div>
+      <button className="txtbtn" style={{ color: 'var(--pk)' }} onClick={() => { if (confirm('この1枚を削除しますか？')) onDel(it.id); }}>削除</button></div>
+    <h2 style={{ fontSize: 26, lineHeight: 1.4, margin: '8px 0 18px' }}>{it.title || '無題'}</h2>
+    {it.mode === 'dig'
+      ? (it.pairs || []).map((p, i) => <div className="pair" key={i}><label>考え {i + 1}</label><div style={{ fontSize: 16, lineHeight: 1.6 }}>{p.t || '—'}</div><label className="why">わけ</label><div style={{ fontSize: 15, lineHeight: 1.6, color: 'var(--sub)' }}>{p.r || '—'}</div></div>)
+      : (it.rows || []).map((r, i) => <div className="line-in" key={i}><i>●</i><div style={{ flex: 1, fontSize: 17, lineHeight: 1.6 }}>{r}</div></div>)}
+  </div></div>
+);
+// ▲ 1枚リーダー
+
+// ▼ 「ファイル」タブ
+const FilesTab = ({ items, openReader }) => {
+  const sheets = useMemo(() => items.filter(i => i.kind === 'sheet').sort((a, b) => b.ts - a.ts), [items]);
+  const [order, setOrder] = useState(null);
+  const shown = order ? order.map(id => sheets.find(s => s.id === id)).filter(Boolean) : sheets;
+  const shuffle = () => setOrder(sheets.map(s => [Math.random(), s.id]).sort((a, b) => a[0] - b[0]).map(x => x[1]));
+  const randomRead = () => { if (sheets.length) openReader(sheets[Math.floor(Math.random() * sheets.length)]); };
+  return (
+    <>
+      <div className="h-date"><div><div className="d disp">Files</div><div className="sub">書いた1枚が並ぶ机 ・ {sheets.length} 枚</div></div>
+        <div className="row"><button className="iconbtn" onClick={shuffle}><Icon n="dice" /></button></div></div>
+      <button className="chip acc" style={{ marginBottom: 18 }} onClick={randomRead} disabled={!sheets.length}>ランダムに読み返す</button>
+      {shown.length === 0 ? <div className="empty">まだ1枚がありません。<br />「書く」画面の ⏱ から、1分で1枚を書いてみましょう。</div> : (
+        <div className="desk">
+          {shown.map(s => {
+            const h = hash(s.id);
+            return (
+              <button key={s.id} className={'sheet' + (s.mode === 'dig' ? ' dig' : '')} style={{ transform: 'rotate(' + (((h % 7) - 3) * 0.8) + 'deg)', marginTop: (h % 3) * 6 }} onClick={() => openReader(s)}>
+                <h4>{s.title || '無題'}</h4>
+                {s.mode === 'dig' ? (s.pairs || []).slice(0, 3).map((p, i) => <p key={i}>・{p.t}</p>) : (s.rows || []).slice(0, 3).map((r, i) => <p key={i}>・{r}</p>)}
+                <span className="st mono">{(new Date(s.ts).getMonth() + 1) + '/' + new Date(s.ts).getDate()}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+};
+// ▲ 「ファイル」タブ
+
+// ▼ 「ふりかえり」タブ
+const ReviewTab = ({ items, openReader }) => {
+  const [period, setPeriod] = useState('week');
+  const [off, setOff] = useState(0);
+  const { s, e, label, sub } = rangeOf(period, off);
+  const list = useMemo(() => items.filter(i => i.ts >= s.getTime() && i.ts < e.getTime()), [items, period, off]);
+  const byDay = useMemo(() => groupByDay(list), [list]);
+  const dayCount = Object.keys(byDay).length;
+  const sheets = list.filter(i => i.kind === 'sheet').length;
+  const c = moodCounts(list);
+  const insights = list.filter(isInsight).sort((a, b) => b.ts - a.ts).slice(0, 6);
+  const goodDays = Object.keys(byDay).filter(k => byDay[k].length >= 3 || byDay[k].some(i => i.kind === 'sheet')).sort().reverse().slice(0, 6);
+  const sum = period === 'day' ? buildSummary(list) : null;
+  const changePeriod = p => { setPeriod(p); setOff(0); };
+  const days7 = period === 'week' ? [...Array(7)].map((_, k) => new Date(s.getFullYear(), s.getMonth(), s.getDate() + k)) : [];
+  // 月カレンダー
+  const calCells = useMemo(() => {
+    if (period !== 'month') return [];
+    const first = s; const blanks = (first.getDay() + 6) % 7; const n = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+    return [...Array(blanks).fill(null), ...[...Array(n)].map((_, k) => new Date(first.getFullYear(), first.getMonth(), k + 1))];
+  }, [period, off]);
+  // 草（これまで）
+  const heat = useMemo(() => {
+    if (period !== 'all') return [];
+    const all = groupByDay(items); const t = new Date(); const w = (t.getDay() + 6) % 7;
+    const start = new Date(t.getFullYear(), t.getMonth(), t.getDate() - w - 7 * 17);
+    return [...Array(126)].map((_, k) => { const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + k); return { d, n: d > t ? -1 : (all[dkey(d)] || []).length }; });
+  }, [period, items]);
+  const months = useMemo(() => {
+    if (period !== 'all') return [];
+    const g = {}; items.forEach(i => { const d = new Date(i.ts); const k = d.getFullYear() + '-' + pad(d.getMonth() + 1); (g[k] = g[k] || []).push(i); });
+    return Object.keys(g).sort().reverse().slice(0, 12).map(k => ({ k, list: g[k], dom: dominant(g[k]) }));
+  }, [period, items]);
+  return (
+    <>
+      <div className="h-date"><div><div className="d disp">Review</div><div className="sub">気持ちの天気と、書いてきた足あと</div></div></div>
+      <div className="seg" style={{ width: '100%', display: 'flex' }}>
+        {[['day', '日'], ['week', '週'], ['month', '月'], ['all', 'これまで']].map(([k, l]) => <button key={k} style={{ flex: 1 }} className={period === k ? 'on' : ''} onClick={() => changePeriod(k)}>{l}</button>)}
+      </div>
+      {period !== 'all' && (
+        <div className="pn"><button onClick={() => setOff(o => o - 1)}><Icon n="back" /></button>
+          <div style={{ textAlign: 'center' }}><b>{label || sub}</b>{label && sub && <div className="mono" style={{ fontSize: 11, color: 'var(--sub)', marginTop: 3 }}>{sub}</div>}</div>
+          <button disabled={off >= 0} onClick={() => setOff(o => o + 1)}><Icon n="next" /></button></div>
+      )}
+      <div className="stat"><div><b>{list.length}</b>件</div><div><b>{dayCount}</b>日書いた</div><div><b>{sheets}</b>枚</div></div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <div className="row" style={{ justifyContent: 'space-between' }}><b style={{ fontSize: 15 }}>気持ちの天気</b><span style={{ fontSize: 13, color: 'var(--sub)' }}>{weatherWords(c)}</span></div>
+        {period === 'week' && (
+          <div className="wx">{days7.map((d, k) => { const l = byDay[dkey(d)] || []; const dm = dominant(l); return (
+            <div key={k}><span>{WD[d.getDay()]}</span><span className="ic" style={{ opacity: dm ? 1 : .25 }}>{dm ? MOOD[dm].icon : '·'}</span>
+              <span className="cn" style={{ background: dm ? MOOD[dm].color : 'var(--panel)', color: dm ? '#10140a' : 'var(--sub)' }}>{l.length}</span></div>); })}</div>
+        )}
+        {period === 'month' && (
+          <div className="cal" style={{ marginTop: 14 }}>{['月', '火', '水', '木', '金', '土', '日'].map(w => <div className="h" key={w}>{w}</div>)}
+            {calCells.map((d, k) => { if (!d) return <div key={k} />; const l = byDay[dkey(d)] || []; const dm = dominant(l); return <div className="c" key={k} style={dm ? { background: 'rgba(255,255,255,.1)' } : null}>{d.getDate()}{dm && <i style={{ background: MOOD[dm].color }} />}</div>; })}</div>
+        )}
+        {period === 'all' && (
+          <>
+            <div className="hint" style={{ margin: '12px 0 6px' }}>これまでの草（直近18週）</div>
+            <div className="heat">{heat.map((h, k) => <i key={k} style={{ visibility: h.n < 0 ? 'hidden' : 'visible', background: h.n > 0 ? 'rgba(200,255,61,' + Math.min(1, .25 + h.n * .18) + ')' : undefined }} />)}</div>
+            <div className="hint" style={{ margin: '16px 0 6px' }}>月ごとの天気</div>
+            <div className="mchips">{months.length ? months.map(m => <span className="mchip" key={m.k}>{MOOD[m.dom].icon}<span className="mono" style={{ fontSize: 12 }}>{m.k.replace('-', '/')}</span><span style={{ color: 'var(--sub)' }}>{m.list.length}</span></span>) : <span style={{ color: 'var(--sub)', fontSize: 13 }}>まだありません</span>}</div>
+          </>
+        )}
+        <div className="mix">{MOODS.filter(m => c[m.key]).map(m => <div key={m.key} style={{ flex: c[m.key], background: m.color }} />)}</div>
+        <div className="mchips">{MOODS.map(m => c[m.key] ? <span className="mchip" key={m.key}><i style={{ background: m.color }} />{m.label} {c[m.key]}</span> : null)}</div>
+        <div className="hint" style={{ marginBottom: 0 }}>{buildPeriodNote(list)}</div>
+      </div>
+
+      {sum && (
+        <>
+          <div className="sec-t"><span>この日のまとめ</span></div>
+          <div className="note">{sum.lines.map((l, i) => <div key={i}>・{l}</div>)}<div style={{ marginTop: sum.lines.length ? 8 : 0 }}>{sum.note}</div></div>
+          {list.sort((a, b) => a.ts - b.ts).map(i => <MemoRow key={i.id} it={i} onStar={() => { }} onDel={() => { }} onOpen={openReader} />)}
+        </>
+      )}
+
+      {period !== 'day' && (
+        <>
+          <div className="sec-t"><span>気づき</span><span>{insights.length}</span></div>
+          {insights.length === 0 ? <div className="hint">気づきはまだありません。メモの「☆ 気づきに」を押すと、ここに集まります。</div>
+            : insights.map(i => <div className="note" key={i.id}>{i.text.replace(/#[^\s#]+/g, '').trim()}<small className="mono">{mdw(i.ts)}</small></div>)}
+          <div className="sec-t"><span>がんばった日</span></div>
+          <div className="mchips">{goodDays.length ? goodDays.map(k => <span className="mchip" key={k}>🔥<span className="mono" style={{ fontSize: 12 }}>{k.slice(5).replace('-', '/')}</span><span style={{ color: 'var(--sub)' }}>{byDay[k].length}件</span></span>) : <span className="hint">1日3件以上、または1枚を書いた日が入ります。</span>}</div>
+        </>
+      )}
+    </>
+  );
+};
+// ▲ 「ふりかえり」タブ
+
+// ▼ 検索オーバーレイ
+const SearchOverlay = ({ items, onClose, openReader, onStar, onDel }) => {
+  const [q, setQ] = useState('');
+  const tags = useMemo(() => { const c = {}; items.forEach(i => parseTags(itemText(i)).forEach(t => c[t] = (c[t] || 0) + 1)); return [...new Set([...Object.keys(c).sort((a, b) => c[b] - c[a]), ...DEFAULT_TAGS])].slice(0, 10); }, [items]);
+  const res = useMemo(() => { const k = q.replace(/^#/, '').trim(); if (!k) return []; return items.filter(i => itemText(i).includes(k)).sort((a, b) => b.ts - a.ts); }, [q, items]);
+  const by = groupByDay(res);
+  const newest = res[0];
+  return (
+    <div className="ov"><div className="in">
+      <div className="ov-h"><button className="txtbtn" onClick={onClose}>← 戻る</button><div className="ttl">さがす</div><span style={{ width: 48 }} /></div>
+      <div className="search"><Icon n="search" /><input autoFocus value={q} placeholder="言葉やタグで検索" onChange={e => setQ(e.target.value)} />{q && <button onClick={() => setQ('')}>✕</button>}</div>
+      <div className="mchips" style={{ margin: '14px 0' }}>{tags.map(t => <button key={t} className="tagbtn" onClick={() => setQ(t)}>#{t}</button>)}</div>
+      {q.trim() && (
+        <div className="note">「{q.replace(/^#/, '')}」のメモが {res.length} 件ありました。{newest && 'いちばん新しいのは ' + mdw(newest.ts) + ' の「' + clip(itemText(newest).replace(/#[^\s#]+/g, '').trim(), 24) + '」です。'}</div>
+      )}
+      {Object.keys(by).sort().reverse().map(k => (
+        <div key={k}><div className="sec-t" style={{ margin: '16px 4px 0' }}><span>{k === dkey(Date.now()) ? '今日' : mdw(new Date(k + 'T00:00:00'))}</span></div>
+          {by[k].map(i => <MemoRow key={i.id} it={i} onStar={onStar} onDel={onDel} onOpen={openReader} />)}</div>
+      ))}
+    </div></div>
+  );
+};
+// ▲ 検索オーバーレイ
+
+// ▼ 「設定」タブ
+const SettingsTab = ({ items, setItems, setToast }) => {
+  const fileRef = useRef(null);
+  const exportJson = () => {
+    const blob = new Blob([JSON.stringify({ app: 'imamemo', v: 1, items }, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'imamemo-' + dkey(Date.now()) + '.json'; a.click(); URL.revokeObjectURL(a.href);
+  };
+  const importJson = e => {
+    const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const d = JSON.parse(r.result); const arr = Array.isArray(d) ? d : d.items;
+        if (!Array.isArray(arr)) throw new Error('bad');
+        setItems(cur => { const ids = new Set(cur.map(i => i.id)); return [...cur, ...arr.filter(i => i && i.id && i.ts && !ids.has(i.id))]; });
+        setToast('読み込みました');
+      } catch (_) { setToast('読み込めないファイルです'); }
+    };
+    r.readAsText(f);
+  };
+  const sample = () => {
+    const base = Date.now(); const out = [];
+    const T = ['朝の散歩で頭がすっきりした #習慣', '会議の前に結論を1行で書いておくと、話がぶれない #仕事', '資料づくりでなんだか不安', 'ありがとうと言われてうれしかった', '今日は筋トレをやる！ #筋トレ', 'モヤモヤを書き出したら、半分は心配しなくていいことだった #気づき', 'ランチで食べた定食がおいしかった', 'やることを3つにしぼったら、1日がすっきり終わった #仕事'];
+    for (let d = 0; d < 12; d++) { const n = 1 + (d * 7) % 5; for (let k = 0; k < n; k++) { const ts = base - d * 86400000 - k * 3600000 * 2 - 600000; const t = T[(d + k * 3) % T.length]; out.push({ id: 's' + d + '_' + k + '_' + uid(), ts, kind: 'memo', text: t, mark: detectMark(t), photo: '' }); } }
+    out.push({ id: 'sh1_' + uid(), ts: base - 3600000, kind: 'sheet', mode: 'one', title: 'どうすれば朝の30分を自分のために使えるか #習慣', rows: ['前の夜にスマホを寝室に持ち込まない', '起きたらすぐ1枚書く', 'コーヒーをいれる間に今日の3つを決める'], tags: ['習慣'] });
+    out.push({ id: 'sh2_' + uid(), ts: base - 86400000 - 3600000, kind: 'sheet', mode: 'dig', title: 'なぜ人前で話すと気後れするのか #仕事', pairs: [{ t: 'よく見られたい気持ちが強い', r: '失敗を見られるのがこわい' }, { t: '言いたいことが決まっていない', r: '準備を後回しにしてきた' }], tags: ['仕事'] });
+    setItems(cur => [...cur, ...out]); setToast('サンプルを入れました');
+  };
+  const wipe = () => { if (confirm('すべてのメモを削除します。元に戻せません。よろしいですか？')) { setItems([]); setToast('削除しました'); } };
+  return (
+    <>
+      <div className="h-date"><div><div className="d disp">Settings</div><div className="sub">データはこの端末のブラウザ内に保存されます</div></div></div>
+      <div className="card" style={{ padding: '4px 14px' }}>
+        <div className="set"><span>保存件数<small>メモ {items.filter(i => i.kind !== 'sheet').length} 件 ・ 1枚 {items.filter(i => i.kind === 'sheet').length} 枚</small></span></div>
+        <button className="set" onClick={exportJson}><span>バックアップを書き出す<small>JSONファイルとして保存</small></span><Icon n="next" /></button>
+        <button className="set" onClick={() => fileRef.current.click()}><span>バックアップを読み込む<small>同じIDのメモは重複しません</small></span><Icon n="next" /></button>
+        <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={importJson} />
+        <button className="set" onClick={sample}><span>サンプルデータを入れる<small>見た目の確認用</small></span><Icon n="next" /></button>
+        <button className="set danger" onClick={wipe} style={{ borderBottom: 0 }}><span>すべて削除</span></button>
+      </div>
+      <div className="hint" style={{ marginTop: 16 }}>ホーム画面に追加すると、他アプリの共有メニューから「イマメモ」に書き込めます（Android）。アイコン長押しの「1分で1枚」ですぐ1枚が開きます。</div>
+    </>
+  );
+};
+// ▲ 「設定」タブ
+
+// ▼ アプリ本体
+const App = () => {
+  const qs = useMemo(() => new URLSearchParams(location.search), []);
+  const [items, setItems] = useState(() => { try { const v = JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (_) { return []; } });
+  const [tab, setTab] = useState('write');
+  const [sheetOpen, setSheetOpen] = useState(qs.get('new') ? { mode: 'one' } : null);
+  const [reader, setReader] = useState(null);
+  const [search, setSearch] = useState(false);
+  const [toast, setToast] = useState('');
+  useEffect(() => { try { localStorage.setItem(STORE_KEY, JSON.stringify(items)); } catch (_) { setToast('保存容量がいっぱいです。バックアップをおすすめします'); } }, [items]);
+  useEffect(() => { if (location.search) { try { history.replaceState(null, '', location.pathname); } catch (_) { } } }, []);
+  useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(''), 2200); return () => clearTimeout(id); }, [toast]);
+  const add = it => setItems(cur => [...cur, { id: uid(), ts: Date.now(), ...it }]);
+  const onStar = id => setItems(cur => cur.map(i => i.id === id ? { ...i, star: !i.star } : i));
+  const onDel = id => { setItems(cur => cur.filter(i => i.id !== id)); setReader(null); };
+  const NAV = [['write', '書く', 'write'], ['files', 'ファイル', 'folder'], ['review', 'ふりかえり', 'cloud'], ['settings', '設定', 'gear']];
+  return (
+    <>
+      <div className="app">
+        {tab === 'write' && <WriteTab items={items} add={add} onStar={onStar} onDel={onDel} openSheet={setSheetOpen} openReader={setReader} prefill={[qs.get('title'), qs.get('text'), qs.get('url')].filter(Boolean).join(' ')} openSearch={() => setSearch(true)} setToast={setToast} />}
+        {tab === 'files' && <FilesTab items={items} openReader={setReader} />}
+        {tab === 'review' && <ReviewTab items={items} openReader={setReader} />}
+        {tab === 'settings' && <SettingsTab items={items} setItems={setItems} setToast={setToast} />}
+      </div>
+      <nav className="nav">{NAV.map(([k, l, ic]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}><Icon n={ic} />{l}</button>)}</nav>
+      {sheetOpen && <SheetEditor initial={sheetOpen} onClose={() => setSheetOpen(null)} onSave={d => { add(d); setSheetOpen(null); setToast('1枚を保存しました'); }} />}
+      {search && <SearchOverlay items={items} onClose={() => setSearch(false)} openReader={setReader} onStar={onStar} onDel={onDel} />}
+      {reader && <SheetReader it={reader} onClose={() => setReader(null)} onDel={onDel} />}
+      {toast && <div className="toast">{toast}</div>}
+    </>
+  );
+};
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => { })); }
+// ▲ アプリ本体
+</script>
+</body>
+</html>
