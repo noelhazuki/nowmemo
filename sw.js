@@ -1,6 +1,6 @@
 // イマメモ Service Worker
 // 更新したら CACHE のバージョン番号を上げる
-const CACHE = 'imamemo-v1';
+const CACHE = 'imamemo-v2';
 const CORE = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 const CDN_HOSTS = ['unpkg.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
